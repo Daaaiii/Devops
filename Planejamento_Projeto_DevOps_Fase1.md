@@ -34,7 +34,7 @@ O projeto é estruturado em duas fases:
 - **Fase 1** — Configuração e Automação Inicial: abrange a configuração do repositório, o pipeline de Integração Contínua (CI) com GitHub Actions e os scripts de Infraestrutura como Código (IaC) utilizando AWS CloudFormation.
 - **Fase 2** — Entrega Contínua, Monitoramento e Segurança: expandirá o pipeline para CD, containerização com Docker, monitoramento e segurança.
 
-> 🔗 **Repositório do Projeto:** *(link a ser inserido após a criação do repositório GitHub)*
+> 🔗 **Repositório do Projeto:** *[Link do repositório GitHub](https://github.com/Daaaiii/Devops.git)*
 
 ### 1.2 Contexto e Motivação
 
