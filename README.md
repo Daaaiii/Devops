@@ -143,6 +143,8 @@ A infraestrutura provisionada pelo AWS CloudFormation na Fase 1 deve contemplar:
 - A instância EC2 deve ter acesso SSH restrito a IPs específicos ou via AWS Systems Manager.
 - Dependências do projeto devem ser verificadas quanto a vulnerabilidades conhecidas (`npm audit` / `pip audit`).
 
+> **Nota — AWS Academy (Learner Lab):** o ambiente não permite criar usuários IAM nem access keys permanentes. As credenciais são temporárias e obtidas diretamente no Learner Lab. Consulte a seção [5.4 Credenciais AWS Academy](#54-credenciais-aws-academy-learner-lab) para o procedimento completo.
+
 ---
 
 ## 4. Plano de Integração Contínua
@@ -310,6 +312,37 @@ cfn-lint infrastructure/cloudformation/*.yaml
 ```
 
 O pipeline de CI executa essa validação automaticamente a cada push/PR.
+
+### 5.4 Credenciais AWS Academy (Learner Lab)
+
+O AWS Academy não permite criar usuários IAM nem access keys permanentes. As credenciais são **temporárias** e precisam ser renovadas a cada sessão (~4 horas de validade).
+
+**Como obter as credenciais:**
+
+1. Acesse o Learner Lab e inicie o ambiente AWS (botão Start Lab)
+2. Clique em **AWS Details** → **AWS CLI**
+3. Copie os três valores exibidos:
+   ```
+   AWS_ACCESS_KEY_ID
+   AWS_SECRET_ACCESS_KEY
+   AWS_SESSION_TOKEN
+   ```
+
+**Como configurar no GitHub (necessário para o deploy na Fase 2):**
+
+Vá em **Settings → Secrets and variables → Actions** e crie os secrets:
+
+| Secret | Valor |
+|--------|-------|
+| `AWS_ACCESS_KEY_ID` | Copiado do Learner Lab |
+| `AWS_SECRET_ACCESS_KEY` | Copiado do Learner Lab |
+| `AWS_SESSION_TOKEN` | Copiado do Learner Lab — **obrigatório no Academy** |
+| `AWS_REGION` | `us-east-1` (região padrão do Academy) |
+| `TEMPLATES_BUCKET` | Nome do bucket S3 onde os templates serão enviados |
+| `BUCKET_SUFFIX` | Sufixo único para os buckets (ex: seu-nome-turma) |
+| `KEY_PAIR_NAME` | Nome do Key Pair criado no console AWS |
+
+> **Atenção:** como as credenciais expiram, o job de deploy no `ci.yml` está **comentado** por padrão. Descomente-o e atualize os secrets imediatamente antes de executar o pipeline na Fase 2.
 
 ---
 

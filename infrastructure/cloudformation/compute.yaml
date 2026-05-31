@@ -47,7 +47,7 @@ Resources:
   WebServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Permite tráfego HTTP, HTTPS e SSH para o servidor web
+      GroupDescription: Permite trafego HTTP HTTPS e SSH para o servidor web
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - Description: HTTP
