@@ -423,6 +423,7 @@ cfn-lint infrastructure/cloudformation/main.yaml
 | Testes automatizados (Jest) | `__tests__/index.test.js` | ✅ Concluído |
 | Configuração de lint (HTMLHint) | `.htmlhintrc`, `package.json` | ✅ Concluído |
 | Scripts IaC — CloudFormation | `infrastructure/cloudformation/` (4 templates) | ✅ Concluído |
+| Proteção de branch `main` | Branch protegida com PR obrigatório + status checks | ✅ Concluído |
 
 ### 8.2 Resultado dos Testes
 
@@ -432,11 +433,9 @@ cfn-lint infrastructure/cloudformation/main.yaml
 - **Vulnerabilidades nas dependências:** 0
 - **Cobertura de testes:** acima do mínimo exigido (60%)
 
-### 8.3 Pendente — Fase 1
+### 8.3 Fase 1 — Concluída
 
-| Entregável | Descrição | Status |
-|-----------|-----------|--------|
-| Proteção de branch no GitHub | Configuração da branch `main` protegida com exigência de PR + CI aprovado | ⏳ Pendente |
+Todos os entregáveis da Fase 1 foram implementados e estão funcionais.
 
 ---
 
