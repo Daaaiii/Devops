@@ -89,9 +89,6 @@ Resources:
 
   ComputeStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - NetworkStack
-      - StorageStack
     Properties:
       TemplateURL: !Sub '${TemplatesBaseURL}/compute.yaml'
       Parameters:

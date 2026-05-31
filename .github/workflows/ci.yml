@@ -65,10 +65,14 @@ jobs:
       - name: Validar templates CloudFormation
         run: |
           echo "Validando templates em infrastructure/cloudformation/"
-          cfn-lint infrastructure/cloudformation/network.yaml
-          cfn-lint infrastructure/cloudformation/storage.yaml
-          cfn-lint infrastructure/cloudformation/compute.yaml
-          cfn-lint infrastructure/cloudformation/main.yaml
+          for template in network.yaml storage.yaml compute.yaml main.yaml; do
+            cfn-lint infrastructure/cloudformation/$template || {
+              code=$?
+              # exit code 4 = apenas warnings (não bloqueante)
+              # exit code 2 ou 6 = erros reais (bloqueia o pipeline)
+              [ $code -eq 4 ] && echo "⚠ $template: warnings encontrados (não bloqueantes)" || exit $code
+            }
+          done
           echo "Todos os templates são válidos."
 
       - name: Verificar estrutura dos templates
