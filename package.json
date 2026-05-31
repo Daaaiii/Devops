@@ -1,0 +1,26 @@
+{
+  "name": "devops-projeto-fase1",
+  "version": "1.0.0",
+  "description": "Projeto DevOps Fase 1 - PUCRS",
+  "scripts": {
+    "test": "jest --coverage",
+    "lint": "htmlhint index.html",
+    "audit": "npm audit --audit-level=moderate"
+  },
+  "devDependencies": {
+    "htmlhint": "^1.1.4",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": ["**/__tests__/**/*.test.js"],
+    "collectCoverageFrom": ["__tests__/**/*.js"],
+    "coverageThreshold": {
+      "global": {
+        "lines": 60
+      }
+    },
+    "coverageReporters": ["text", "lcov"]
+  }
+}

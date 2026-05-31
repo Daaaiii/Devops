@@ -4,7 +4,7 @@
 ---
 
 **Aluna:** Daiane Deponti  
-**E-mail:** dainha85@gmail.com  
+**E-mail:** daiane.deponti@edu.pucrs.br  
 **Instituição:** PUCRS — Pontifícia Universidade Católica do Rio Grande do Sul  
 **Disciplina:** DevOps na Prática  
 **Entrega:** Fase 1 — Documentação de Planejamento  
@@ -19,7 +19,8 @@
 3. [Requisitos do Projeto](#3-requisitos-do-projeto)
 4. [Plano de Integração Contínua](#4-plano-de-integração-contínua)
 5. [Cronograma Previsto](#5-cronograma-previsto)
-6. [Referências](#6-referências)
+6. [Status de Implementação — Fase 1](#6-status-de-implementação--fase-1)
+7. [Referências](#7-referências)
 
 ---
 
@@ -27,7 +28,7 @@
 
 ### 1.1 Visão Geral
 
-Este projeto tem como finalidade implementar um pipeline completo de DevOps para uma aplicação web, cobrindo desde a integração contínua até a entrega contínua em ambiente de nuvem. A aplicação alvo é uma API REST desenvolvida em Node.js (ou Python/Flask), projetada para fins didáticos e servindo de base para a aplicação das práticas DevOps ensinadas na disciplina.
+Este projeto tem como finalidade implementar um pipeline completo de DevOps para uma aplicação web, cobrindo desde a integração contínua até a entrega contínua em ambiente de nuvem. A aplicação alvo é uma página HTML simples, projetada para fins didáticos e servindo de base para a aplicação das práticas DevOps ensinadas na disciplina.
 
 O projeto é estruturado em duas fases:
 
@@ -46,13 +47,14 @@ Este projeto permite vivenciar na prática os conceitos teóricos da disciplina:
 
 | Categoria | Tecnologia / Ferramenta | Finalidade |
 |-----------|------------------------|------------|
-| Linguagem | Node.js (JavaScript) ou Python | Desenvolvimento da aplicação |
+| Linguagem | Node.js (JavaScript) | Desenvolvimento da aplicação e execução dos testes |
 | Controle de Versão | Git + GitHub | Repositório de código e colaboração |
 | CI/CD | GitHub Actions | Automação do pipeline |
+| Lint | HTMLHint | Validação e qualidade do código HTML |
+| Testes | Jest + jest-environment-jsdom | Testes unitários com DOM e relatório de cobertura |
 | IaC | AWS CloudFormation | Provisionamento de infraestrutura |
 | Nuvem | Amazon Web Services (AWS) | Hospedagem e serviços gerenciados |
 | Containers | Docker *(Fase 2)* | Containerização da aplicação |
-| Testes | Jest / Pytest | Testes unitários e de integração |
 | Monitoramento | AWS CloudWatch *(Fase 2)* | Logs e métricas |
 
 ---
@@ -159,33 +161,33 @@ O repositório seguirá o modelo GitFlow simplificado:
 ### 4.2 Etapas do Pipeline CI
 
 ```
-Trigger (push / PR)
+Trigger (push / PR / workflow_dispatch)
        │
        ▼
 ┌─────────────────────────────────────────────────────────┐
-│                  GitHub Actions Workflow                  │
-│                                                          │
-│  1. Checkout          → Clona o repositório              │
-│  2. Setup Ambiente    → Node.js / Python na versão certa │
-│  3. Instalar Deps     → npm install / pip install        │
-│  4. Lint              → ESLint / Flake8                  │
-│  5. Testes Unitários  → Jest / Pytest + cobertura        │
-│  6. Build             → Gera artefato de distribuição    │
-│  7. Auditoria         → npm audit / pip audit            │
-│  8. Notificação       → Status no GitHub PR/commit       │
+│            GitHub Actions — ci.yml                      │
+│                                                         │
+│  1. Checkout          → Clona o repositório             │
+│  2. Setup Ambiente    → Node.js 20 (com cache npm)      │
+│  3. Instalar Deps     → npm install                     │
+│  4. Lint              → HTMLHint (index.html)           │
+│  5. Testes Unitários  → Jest + cobertura (jsdom)        │
+│  6. Auditoria         → npm audit --audit-level=moderate│
+│  7. Artefato          → Upload do relatório de cobertura│
+│  8. Notificação       → Status no GitHub PR/commit      │
 └─────────────────────────────────────────────────────────┘
 ```
 
 | Etapa | Descrição |
 |-------|-----------|
 | 1. Checkout | Clona o repositório e prepara o ambiente no runner do GitHub Actions. |
-| 2. Setup do Ambiente | Instala a versão correta do Node.js ou Python conforme especificado no workflow. |
-| 3. Instalação de Dependências | Executa `npm install` ou `pip install -r requirements.txt`. |
-| 4. Lint | Verifica qualidade e padronização do código com ESLint / Flake8. |
-| 5. Testes Unitários | Executa suite de testes com Jest / Pytest e gera relatório de cobertura. |
-| 6. Build | Gera o artefato de distribuição da aplicação pronto para deploy. |
-| 7. Verificação de Segurança | Executa `npm audit` / `pip audit` para identificar vulnerabilidades. |
-| 8. Notificação | GitHub Actions reporta sucesso ou falha no Pull Request. |
+| 2. Setup do Ambiente | Instala Node.js 20 com cache de pacotes npm para execuções mais rápidas. |
+| 3. Instalação de Dependências | Executa `npm install` para instalar Jest e HTMLHint. |
+| 4. Lint | Valida a qualidade e estrutura do HTML com HTMLHint usando as regras de `.htmlhintrc`. |
+| 5. Testes Unitários | Executa 19 testes com Jest em ambiente jsdom e gera relatório de cobertura (mínimo 60%). |
+| 6. Verificação de Segurança | Executa `npm audit` para identificar vulnerabilidades nas dependências. |
+| 7. Artefato de Cobertura | Faz upload do relatório de cobertura como artefato no GitHub Actions (retido 7 dias). |
+| 8. Notificação | GitHub Actions reporta sucesso ou falha no commit e no Pull Request automaticamente. |
 
 ### 4.3 Gatilhos do Pipeline
 
@@ -232,7 +234,37 @@ Na Fase 2, esse deploy será automatizado pelo pipeline como parte do CD.
 
 ---
 
-## 6. Referências
+## 6. Status de Implementação — Fase 1
+
+### 6.1 Entregas Concluídas
+
+| Entregável | Arquivo(s) | Status |
+|-----------|------------|--------|
+| Documentação de Planejamento | `Planejamento_Projeto_DevOps_Fase1.md` | ✅ Concluído |
+| Repositório GitHub configurado | [github.com/Daaaiii/Devops](https://github.com/Daaaiii/Devops.git) | ✅ Concluído |
+| Aplicação HTML | `index.html` | ✅ Concluído |
+| Pipeline de CI (GitHub Actions) | `.github/workflows/ci.yml` | ✅ Concluído |
+| Testes automatizados (Jest) | `__tests__/index.test.js` | ✅ Concluído |
+| Configuração de lint (HTMLHint) | `.htmlhintrc`, `package.json` | ✅ Concluído |
+
+### 6.2 Resultado dos Testes
+
+- **Total de testes:** 19 — todos passando
+- **Lint:** sem erros encontrados
+- **Vulnerabilidades nas dependências:** 0
+- **Cobertura de testes:** acima do mínimo exigido (60%)
+
+### 6.3 Pendente — Fase 1
+
+| Entregável | Descrição | Status |
+|-----------|-----------|--------|
+| Scripts IaC (CloudFormation) | Templates `infrastructure/main.yaml`, `network.yaml`, `compute.yaml`, `storage.yaml` | ⏳ Pendente |
+| Proteção de branch no GitHub | Configuração de branch `main` protegida com exigência de PR + CI aprovado | ⏳ Pendente |
+| README do repositório | Arquivo `README.md` com instruções de execução (RF-08) | ⏳ Pendente |
+
+---
+
+## 7. Referências
 
 - AWS CloudFormation User Guide. Disponível em: https://docs.aws.amazon.com/cloudformation/
 - GitHub Actions Documentation. Disponível em: https://docs.github.com/en/actions
@@ -243,4 +275,4 @@ Na Fase 2, esse deploy será automatizado pelo pipeline como parte do CD.
 ---
 
 *Documento gerado em Maio de 2026 — Fase 1: Configuração e Automação Inicial*  
-*PUCRS — DevOps na Prática — Daiane Deponti*
+*PUCRS — DevOps na Prática — Daiane Deponti Bolzan*
