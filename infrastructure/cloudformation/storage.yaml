@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Bucket S3 para hospedagem estática do site e armazenamento de artefatos
+  do projeto DevOps Fase 1 - PUCRS.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+    Description: Ambiente de deploy
+
+  BucketNameSuffix:
+    Type: String
+    Description: Sufixo único para o nome do bucket (ex. seu-nome-turma)
+    MinLength: 3
+    MaxLength: 30
+    AllowedPattern: '[a-z0-9\-]+'
+
+Resources:
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'devops-fase1-${Environment}-${BucketNameSuffix}'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: !Sub 'devops-fase1-${Environment}-website'
+        - Key: Project
+          Value: DevOps-Fase1
+        - Key: Environment
+          Value: !Ref Environment
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub '${WebsiteBucket.Arn}/*'
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'devops-fase1-${Environment}-artifacts-${BucketNameSuffix}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub 'devops-fase1-${Environment}-artifacts'
+        - Key: Project
+          Value: DevOps-Fase1
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  WebsiteURL:
+    Description: URL pública do site estático no S3
+    Value: !GetAtt WebsiteBucket.WebsiteURL
+    Export:
+      Name: !Sub '${AWS::StackName}-WebsiteURL'
+
+  WebsiteBucketName:
+    Description: Nome do bucket do site
+    Value: !Ref WebsiteBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-WebsiteBucketName'
+
+  WebsiteBucketArn:
+    Description: ARN do bucket do site
+    Value: !GetAtt WebsiteBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-WebsiteBucketArn'
+
+  ArtifactsBucketName:
+    Description: Nome do bucket de artefatos
+    Value: !Ref ArtifactsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-ArtifactsBucketName'

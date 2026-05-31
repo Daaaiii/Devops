@@ -1,0 +1,170 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Instância EC2 t2.micro com Security Group, IAM Role e User Data
+  para servir a aplicação web do projeto DevOps Fase 1 - PUCRS.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+    Description: Ambiente de deploy
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: ID da VPC onde a instância será criada
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: ID da subrede pública para a instância
+
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    Description: Tipo da instância EC2 (t2.micro está no Free Tier)
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Nome do Key Pair para acesso SSH à instância
+
+  WebsiteBucketName:
+    Type: String
+    Description: Nome do bucket S3 que contém os arquivos do site
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+    Description: ID da AMI mais recente do Amazon Linux 2 (via SSM)
+
+Resources:
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Permite tráfego HTTP, HTTPS e SSH para o servidor web
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: HTTP
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - Description: HTTPS
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - Description: SSH (restringir em produção)
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - Description: Todo tráfego de saída
+          IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-devops-web-sg'
+        - Key: Project
+          Value: DevOps-Fase1
+
+  WebServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-devops-web-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3WebsiteAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${WebsiteBucketName}'
+                  - !Sub 'arn:aws:s3:::${WebsiteBucketName}/*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Tags:
+        - Key: Project
+          Value: DevOps-Fase1
+
+  WebServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${Environment}-devops-web-profile'
+      Roles:
+        - !Ref WebServerRole
+
+  WebServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestAmiId
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref WebServerInstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd aws-cli
+          systemctl start httpd
+          systemctl enable httpd
+          aws s3 cp s3://${WebsiteBucketName}/index.html /var/www/html/index.html
+          echo "Deploy realizado em: $(date)" >> /var/log/user-data.log
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-devops-web-server'
+        - Key: Project
+          Value: DevOps-Fase1
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  InstanceId:
+    Description: ID da instância EC2
+    Value: !Ref WebServerInstance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+
+  PublicIP:
+    Description: Endereço IP público da instância
+    Value: !GetAtt WebServerInstance.PublicIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicIP'
+
+  PublicDNS:
+    Description: DNS público da instância
+    Value: !GetAtt WebServerInstance.PublicDnsName
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicDNS'
+
+  WebsiteURL:
+    Description: URL da aplicação web
+    Value: !Sub 'http://${WebServerInstance.PublicDnsName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-WebsiteURL'
+
+  SecurityGroupId:
+    Description: ID do Security Group
+    Value: !Ref WebServerSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'

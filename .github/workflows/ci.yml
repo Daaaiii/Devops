@@ -45,3 +45,39 @@ jobs:
           name: coverage-report
           path: coverage/
           retention-days: 7
+
+  iac-validation:
+    name: Validação IaC — CloudFormation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar cfn-lint
+        run: pip install cfn-lint
+
+      - name: Validar templates CloudFormation
+        run: |
+          echo "Validando templates em infrastructure/cloudformation/"
+          cfn-lint infrastructure/cloudformation/network.yaml
+          cfn-lint infrastructure/cloudformation/storage.yaml
+          cfn-lint infrastructure/cloudformation/compute.yaml
+          cfn-lint infrastructure/cloudformation/main.yaml
+          echo "Todos os templates são válidos."
+
+      - name: Verificar estrutura dos templates
+        run: |
+          echo "Verificando presença dos templates obrigatórios..."
+          for template in network.yaml storage.yaml compute.yaml main.yaml; do
+            if [ -f "infrastructure/cloudformation/$template" ]; then
+              echo "✓ $template encontrado"
+            else
+              echo "✗ $template NÃO encontrado" && exit 1
+            fi
+          done

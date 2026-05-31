@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Stack principal do projeto DevOps Fase 1 - PUCRS.
+  Orquestra os stacks de rede (network), armazenamento (storage) e
+  computação (compute) via nested stacks.
+
+  Ordem de deploy dos stacks individuais:
+    1. network.yaml  → cria VPC e subrede
+    2. storage.yaml  → cria buckets S3
+    3. compute.yaml  → cria EC2 (depende dos outputs acima)
+
+  Para deploy via nested stacks, faça upload dos templates para S3
+  e informe a URL em TemplatesBaseURL.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+    Description: Ambiente de deploy
+
+  TemplatesBaseURL:
+    Type: String
+    Description: >
+      URL base do bucket S3 onde os templates foram carregados.
+      Exemplo: https://s3.amazonaws.com/meu-bucket/cloudformation
+    AllowedPattern: 'https://.*'
+
+  BucketNameSuffix:
+    Type: String
+    Description: Sufixo único para os nomes dos buckets S3 (ex. seu-nome-turma)
+    MinLength: 3
+    MaxLength: 30
+    AllowedPattern: '[a-z0-9\-]+'
+
+  VpcCIDR:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: Bloco CIDR da VPC
+
+  PublicSubnetCIDR:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: Bloco CIDR da subrede pública
+
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    Description: Tipo da instância EC2
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Nome do Key Pair para acesso SSH
+
+Resources:
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBaseURL}/network.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        VpcCIDR: !Ref VpcCIDR
+        PublicSubnetCIDR: !Ref PublicSubnetCIDR
+      Tags:
+        - Key: Project
+          Value: DevOps-Fase1
+        - Key: Layer
+          Value: network
+
+  StorageStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBaseURL}/storage.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        BucketNameSuffix: !Ref BucketNameSuffix
+      Tags:
+        - Key: Project
+          Value: DevOps-Fase1
+        - Key: Layer
+          Value: storage
+
+  ComputeStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - NetworkStack
+      - StorageStack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBaseURL}/compute.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        VpcId: !GetAtt NetworkStack.Outputs.VPCId
+        SubnetId: !GetAtt NetworkStack.Outputs.PublicSubnetId
+        InstanceType: !Ref InstanceType
+        KeyPairName: !Ref KeyPairName
+        WebsiteBucketName: !GetAtt StorageStack.Outputs.WebsiteBucketName
+      Tags:
+        - Key: Project
+          Value: DevOps-Fase1
+        - Key: Layer
+          Value: compute
+
+Outputs:
+  VPCId:
+    Description: ID da VPC criada
+    Value: !GetAtt NetworkStack.Outputs.VPCId
+
+  WebsiteS3URL:
+    Description: URL do site hospedado no S3
+    Value: !GetAtt StorageStack.Outputs.WebsiteURL
+
+  EC2PublicIP:
+    Description: IP público da instância EC2
+    Value: !GetAtt ComputeStack.Outputs.PublicIP
+
+  EC2WebsiteURL:
+    Description: URL da aplicação servida pelo EC2
+    Value: !GetAtt ComputeStack.Outputs.WebsiteURL
+
+  ArtifactsBucket:
+    Description: Bucket para artefatos do pipeline
+    Value: !GetAtt StorageStack.Outputs.ArtifactsBucketName

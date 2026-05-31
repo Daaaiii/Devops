@@ -18,9 +18,11 @@
 2. [Objetivos do Projeto](#2-objetivos-do-projeto)
 3. [Requisitos do Projeto](#3-requisitos-do-projeto)
 4. [Plano de Integração Contínua](#4-plano-de-integração-contínua)
-5. [Cronograma Previsto](#5-cronograma-previsto)
-6. [Status de Implementação — Fase 1](#6-status-de-implementação--fase-1)
-7. [Referências](#7-referências)
+5. [Infraestrutura como Código](#5-infraestrutura-como-código)
+6. [Como Executar o Projeto](#6-como-executar-o-projeto)
+7. [Cronograma Previsto](#7-cronograma-previsto)
+8. [Status de Implementação — Fase 1](#8-status-de-implementação--fase-1)
+9. [Referências](#9-referências)
 
 ---
 
@@ -191,37 +193,177 @@ Trigger (push / PR / workflow_dispatch)
 
 ### 4.3 Gatilhos do Pipeline
 
+O pipeline é composto por dois jobs independentes que executam em paralelo:
+
+- **`ci`** — Lint, testes e auditoria de segurança da aplicação Node.js
+- **`iac-validation`** — Validação dos templates CloudFormation com `cfn-lint`
+
+Ambos são acionados por:
 - Push para as branches `main` e `develop`
 - Abertura ou atualização de Pull Request direcionado para `main`
 - Execução manual via `workflow_dispatch` (botão no GitHub Actions)
 
-### 4.4 Especificação da Infraestrutura (CloudFormation)
-
-A infraestrutura será inteiramente definida como código (IaC) usando AWS CloudFormation, garantindo rastreabilidade, reprodutibilidade e consistência entre ambientes. Os templates serão organizados em:
-
 ```
-infrastructure/
-├── main.yaml           # Stack raiz (nested stacks)
-├── network.yaml        # VPC, subnets, Internet Gateway
-├── compute.yaml        # EC2, Security Groups, IAM Role
-└── storage.yaml        # Bucket S3 para artefatos e logs
+Trigger (push / PR / workflow_dispatch)
+       │
+       ├─────────────────────────────────────┐
+       ▼                                     ▼
+┌──────────────────────────┐   ┌──────────────────────────────┐
+│   Job: ci                │   │   Job: iac-validation        │
+│  Node.js 20              │   │  Python 3.12                 │
+│                          │   │                              │
+│  1. Checkout             │   │  1. Checkout                 │
+│  2. Setup Node.js 20     │   │  2. Setup Python 3.12        │
+│  3. npm install          │   │  3. pip install cfn-lint     │
+│  4. HTMLHint (lint)      │   │  4. cfn-lint (4 templates)   │
+│  5. Jest + cobertura     │   │  5. Verificar estrutura IaC  │
+│  6. npm audit            │   └──────────────────────────────┘
+│  7. Upload cobertura     │
+└──────────────────────────┘
 ```
-
-O deploy dos stacks poderá ser executado manualmente via AWS CLI:
-
-```bash
-aws cloudformation deploy \
-  --template-file infrastructure/main.yaml \
-  --stack-name devops-projeto \
-  --parameter-overrides Environment=dev \
-  --capabilities CAPABILITY_IAM
-```
-
-Na Fase 2, esse deploy será automatizado pelo pipeline como parte do CD.
 
 ---
 
-## 5. Cronograma Previsto
+## 5. Infraestrutura como Código
+
+### 5.1 Estrutura dos Templates
+
+A infraestrutura é inteiramente definida como código usando AWS CloudFormation, garantindo rastreabilidade, reprodutibilidade e consistência entre ambientes. Os templates estão organizados em camadas independentes:
+
+```
+infrastructure/
+└── cloudformation/
+    ├── main.yaml       # Stack raiz — orquestra os nested stacks
+    ├── network.yaml    # Rede: VPC, subrede pública, Internet Gateway, tabela de rotas
+    ├── compute.yaml    # Computação: EC2 t2.micro, Security Group, IAM Role
+    └── storage.yaml    # Armazenamento: S3 para site estático e artefatos
+```
+
+| Template | Recursos AWS Criados |
+|----------|----------------------|
+| `network.yaml` | `AWS::EC2::VPC`, `AWS::EC2::Subnet`, `AWS::EC2::InternetGateway`, `AWS::EC2::Route` |
+| `storage.yaml` | `AWS::S3::Bucket` (site + artefatos), `AWS::S3::BucketPolicy` |
+| `compute.yaml` | `AWS::EC2::Instance` (t2.micro), `AWS::EC2::SecurityGroup`, `AWS::IAM::Role`, `AWS::IAM::InstanceProfile` |
+| `main.yaml` | `AWS::CloudFormation::Stack` (nested — referencia os 3 acima) |
+
+### 5.2 Parâmetros Configuráveis
+
+Todos os templates aceitam o parâmetro `Environment` com os valores `production`, `staging` ou `development`, garantindo o isolamento entre ambientes.
+
+### 5.3 Como Fazer o Deploy
+
+**Pré-requisitos:** AWS CLI instalado e configurado com permissões adequadas (`aws configure`).
+
+**Opção A — Deploy de stacks individuais (ordem obrigatória):**
+
+```bash
+# 1. Rede
+aws cloudformation deploy \
+  --template-file infrastructure/cloudformation/network.yaml \
+  --stack-name devops-fase1-network \
+  --parameter-overrides Environment=production
+
+# 2. Armazenamento
+aws cloudformation deploy \
+  --template-file infrastructure/cloudformation/storage.yaml \
+  --stack-name devops-fase1-storage \
+  --parameter-overrides Environment=production BucketNameSuffix=seu-nome
+
+# 3. Computação (depende dos outputs dos stacks acima)
+aws cloudformation deploy \
+  --template-file infrastructure/cloudformation/compute.yaml \
+  --stack-name devops-fase1-compute \
+  --parameter-overrides \
+      Environment=production \
+      VpcId=<VpcId do stack network> \
+      SubnetId=<SubnetId do stack network> \
+      WebsiteBucketName=<BucketName do stack storage> \
+      KeyPairName=<nome-do-seu-key-pair> \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+**Opção B — Deploy via stack principal (nested stacks):**
+
+```bash
+# Upload dos templates para S3
+aws s3 cp infrastructure/cloudformation/ s3://MEU-BUCKET/cloudformation/ --recursive
+
+# Deploy do stack principal
+aws cloudformation deploy \
+  --template-file infrastructure/cloudformation/main.yaml \
+  --stack-name devops-fase1 \
+  --parameter-overrides \
+      Environment=production \
+      TemplatesBaseURL=https://s3.amazonaws.com/MEU-BUCKET/cloudformation \
+      BucketNameSuffix=seu-nome \
+      KeyPairName=<nome-do-seu-key-pair> \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+### 5.4 Validação dos Templates
+
+Para validar os templates localmente sem precisar de credenciais AWS, utilize `cfn-lint`:
+
+```bash
+pip install cfn-lint
+cfn-lint infrastructure/cloudformation/*.yaml
+```
+
+O pipeline de CI executa essa validação automaticamente a cada push/PR.
+
+---
+
+## 6. Como Executar o Projeto
+
+### 6.1 Pré-requisitos
+
+- Node.js 20 ou superior
+- npm 9 ou superior
+- Git
+
+### 6.2 Executar Localmente
+
+```bash
+# 1. Clone o repositório
+git clone https://github.com/Daaaiii/Devops.git
+cd Devops
+
+# 2. Instale as dependências
+npm install
+
+# 3. Execute o lint do HTML
+npm run lint
+
+# 4. Execute os testes com cobertura
+npm test
+
+# 5. Execute a auditoria de segurança
+npm audit --audit-level=moderate
+```
+
+### 6.3 Visualizar a Aplicação
+
+Abra o arquivo `index.html` diretamente no navegador, ou use um servidor HTTP local:
+
+```bash
+# Com Python (já disponível na maioria dos sistemas)
+python -m http.server 8080
+# Acesse: http://localhost:8080
+```
+
+### 6.4 Executar Validação de IaC Localmente
+
+```bash
+pip install cfn-lint
+cfn-lint infrastructure/cloudformation/network.yaml
+cfn-lint infrastructure/cloudformation/storage.yaml
+cfn-lint infrastructure/cloudformation/compute.yaml
+cfn-lint infrastructure/cloudformation/main.yaml
+```
+
+---
+
+## 7. Cronograma Previsto
 
 | Semana | Atividade | Entregável |
 |--------|-----------|------------|
@@ -234,45 +376,47 @@ Na Fase 2, esse deploy será automatizado pelo pipeline como parte do CD.
 
 ---
 
-## 6. Status de Implementação — Fase 1
+## 8. Status de Implementação — Fase 1
 
-### 6.1 Entregas Concluídas
+### 8.1 Entregas Concluídas
 
 | Entregável | Arquivo(s) | Status |
 |-----------|------------|--------|
-| Documentação de Planejamento | `Planejamento_Projeto_DevOps_Fase1.md` | ✅ Concluído |
+| Documentação de Planejamento | `README.md` | ✅ Concluído |
 | Repositório GitHub configurado | [github.com/Daaaiii/Devops](https://github.com/Daaaiii/Devops.git) | ✅ Concluído |
 | Aplicação HTML | `index.html` | ✅ Concluído |
-| Pipeline de CI (GitHub Actions) | `.github/workflows/ci.yml` | ✅ Concluído |
+| Pipeline de CI — aplicação | `.github/workflows/ci.yml` job `ci` | ✅ Concluído |
+| Pipeline de CI — validação IaC | `.github/workflows/ci.yml` job `iac-validation` | ✅ Concluído |
 | Testes automatizados (Jest) | `__tests__/index.test.js` | ✅ Concluído |
 | Configuração de lint (HTMLHint) | `.htmlhintrc`, `package.json` | ✅ Concluído |
+| Scripts IaC — CloudFormation | `infrastructure/cloudformation/` (4 templates) | ✅ Concluído |
 
-### 6.2 Resultado dos Testes
+### 8.2 Resultado dos Testes
 
 - **Total de testes:** 19 — todos passando
-- **Lint:** sem erros encontrados
+- **Lint HTML:** sem erros encontrados
+- **Validação CloudFormation (`cfn-lint`):** 4 templates válidos
 - **Vulnerabilidades nas dependências:** 0
 - **Cobertura de testes:** acima do mínimo exigido (60%)
 
-### 6.3 Pendente — Fase 1
+### 8.3 Pendente — Fase 1
 
 | Entregável | Descrição | Status |
 |-----------|-----------|--------|
-| Scripts IaC (CloudFormation) | Templates `infrastructure/main.yaml`, `network.yaml`, `compute.yaml`, `storage.yaml` | ⏳ Pendente |
-| Proteção de branch no GitHub | Configuração de branch `main` protegida com exigência de PR + CI aprovado | ⏳ Pendente |
-| README do repositório | Arquivo `README.md` com instruções de execução (RF-08) | ⏳ Pendente |
+| Proteção de branch no GitHub | Configuração da branch `main` protegida com exigência de PR + CI aprovado | ⏳ Pendente |
 
 ---
 
-## 7. Referências
+## 9. Referências
 
 - AWS CloudFormation User Guide. Disponível em: https://docs.aws.amazon.com/cloudformation/
 - GitHub Actions Documentation. Disponível em: https://docs.github.com/en/actions
+- cfn-lint — CloudFormation Linter. Disponível em: https://github.com/aws-cloudformation/cfn-lint
 - Kim, G. et al. **Manual de DevOps: Como obter agilidade, confiabilidade e segurança em organizações tecnológicas.** Alta Books, 2018.
 - Humble, J.; Farley, D. **Continuous Delivery: Reliable Software Releases through Build, Test, and Deployment Automation.** Addison-Wesley, 2010.
 - Fowler, M. **Continuous Integration.** Disponível em: https://martinfowler.com/articles/continuousIntegration.html
 
 ---
 
-*Documento gerado em Maio de 2026 — Fase 1: Configuração e Automação Inicial*  
+*Documento atualizado em Maio de 2026 — Fase 1: Configuração e Automação Inicial*  
 *PUCRS — DevOps na Prática — Daiane Deponti Bolzan*
