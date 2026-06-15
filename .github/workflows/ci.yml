@@ -86,48 +86,35 @@ jobs:
             fi
           done
 
-  # ------------------------------------------------------------
-  # Job de deploy — ativado apenas na Fase 2.
-  # O AWS Academy (Learner Lab) fornece credenciais temporárias
-  # que incluem AWS_SESSION_TOKEN (obrigatório — sem ele a
-  # autenticação falha). Atualize os três secrets no GitHub
-  # (Settings → Secrets → Actions) antes de habilitar este job.
-  #
-  # Como obter as credenciais no Learner Lab:
-  #   AWS Details → AWS CLI → copie as três variáveis abaixo.
-  #   Atenção: as credenciais expiram em ~4h; renove antes do deploy.
-  # ------------------------------------------------------------
-  # deploy:
-  #   name: Deploy CloudFormation — AWS Academy
-  #   runs-on: ubuntu-latest
-  #   needs: [ci, iac-validation]
-  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  #
-  #   steps:
-  #     - name: Checkout do repositório
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Configurar credenciais AWS (Learner Lab)
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-  #         aws-region: ${{ secrets.AWS_REGION }}
-  #
-  #     - name: Upload dos templates para S3
-  #       run: |
-  #         aws s3 cp infrastructure/cloudformation/ \
-  #           s3://${{ secrets.TEMPLATES_BUCKET }}/cloudformation/ --recursive
-  #
-  #     - name: Deploy do stack principal
-  #       run: |
-  #         aws cloudformation deploy \
-  #           --template-file infrastructure/cloudformation/main.yaml \
-  #           --stack-name devops-fase1 \
-  #           --parameter-overrides \
-  #               Environment=production \
-  #               TemplatesBaseURL=https://s3.amazonaws.com/${{ secrets.TEMPLATES_BUCKET }}/cloudformation \
-  #               BucketNameSuffix=${{ secrets.BUCKET_SUFFIX }} \
-  #               KeyPairName=${{ secrets.KEY_PAIR_NAME }} \
-  #           --capabilities CAPABILITY_NAMED_IAM
+  deploy:
+    name: Deploy — S3 Static Hosting
+    runs-on: ubuntu-latest
+    needs: [ci, iac-validation]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Build da imagem Docker (multi-stage)
+        run: docker build -t devops-app .
+
+      - name: Configurar credenciais AWS (Learner Lab)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy para S3 — hospedagem estática
+        run: |
+          aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }} \
+            --exclude "*" \
+            --include "index.html" \
+            --delete \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Exibir URL do site
+        run: |
+          echo "Site publicado em: http://${{ secrets.S3_BUCKET_NAME }}.s3-website-${{ secrets.AWS_REGION }}.amazonaws.com"
