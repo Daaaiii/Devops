@@ -107,9 +107,28 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Deploy stack CloudFormation — storage
+        run: |
+          aws cloudformation deploy \
+            --template-file infrastructure/cloudformation/storage.yaml \
+            --stack-name devops-fase1-storage \
+            --parameter-overrides BucketNameSuffix=devops-pucrs \
+            --region ${{ secrets.AWS_REGION }} \
+            --no-fail-on-empty-changeset
+
+      - name: Obter nome do bucket via output do CloudFormation
+        id: bucket
+        run: |
+          BUCKET_NAME=$(aws cloudformation describe-stacks \
+            --stack-name devops-fase1-storage \
+            --query "Stacks[0].Outputs[?OutputKey=='WebsiteBucketName'].OutputValue" \
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
+          echo "name=$BUCKET_NAME" >> $GITHUB_OUTPUT
+
       - name: Deploy para S3 — hospedagem estática
         run: |
-          aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }} \
+          aws s3 sync . s3://${{ steps.bucket.outputs.name }} \
             --exclude "*" \
             --include "index.html" \
             --delete \
@@ -117,4 +136,4 @@ jobs:
 
       - name: Exibir URL do site
         run: |
-          echo "Site publicado em: http://${{ secrets.S3_BUCKET_NAME }}.s3-website-${{ secrets.AWS_REGION }}.amazonaws.com"
+          echo "Site publicado em: http://${{ steps.bucket.outputs.name }}.s3-website-${{ secrets.AWS_REGION }}.amazonaws.com"

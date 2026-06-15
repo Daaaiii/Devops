@@ -15,7 +15,7 @@ Parameters:
 
   BucketNameSuffix:
     Type: String
-    Description: Sufixo único para o nome do bucket (ex. seu-nome-turma)
+    Description: devops-pucrs
     MinLength: 3
     MaxLength: 30
     AllowedPattern: '[a-z0-9\-]+'
