@@ -1,7 +1,10 @@
 name: CD Pipeline
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
     branches:
       - main
   workflow_dispatch:
@@ -10,7 +13,9 @@ jobs:
   deploy:
     name: Deploy — S3 Static Hosting
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout do repositório

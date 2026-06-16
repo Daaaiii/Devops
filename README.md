@@ -337,7 +337,7 @@ python -m http.server 8080
 
 ```bash
 docker build -t devops-app .
-docker run -p 8080:80 devops-app
+docker run -p 8080:80 --name devops-app devops-app
 # Acesse: http://localhost:8080
 ```
 
