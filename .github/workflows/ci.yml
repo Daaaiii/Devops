@@ -136,4 +136,4 @@ jobs:
 
       - name: Exibir URL do site
         run: |
-          echo "Site publicado em: http://${{ steps.bucket.outputs.name }}.s3-website-${{ secrets.AWS_REGION }}.amazonaws.com"
+          echo "Site publicado em: http://${{ steps.bucket.outputs.name }}.s3-${{ secrets.AWS_REGION }}.amazonaws.com/index.html"
