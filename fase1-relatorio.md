@@ -112,7 +112,7 @@ Este job valida a qualidade e a segurança da aplicação. Roda em um runner Ubu
 
 Clona o repositório dentro do ambiente de execução (runner). Sem este passo, os demais não teriam acesso ao código-fonte. A action `actions/checkout@v4` é a forma oficial e recomendada pelo GitHub para isso.
 
-#### Passo 2 — Configurar Node.js 20
+#### Passo 2 — Configurar Node.js 24
 
 ```yaml
 - name: Configurar Node.js 24

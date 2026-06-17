@@ -33,7 +33,7 @@ O arquivo `.github/workflows/ci.yml` é acionado em push para `main` e `develop`
 | Passo | Comando | Objetivo |
 |-------|---------|----------|
 | Checkout | `actions/checkout@v4` | Obtém o código no runner |
-| Setup Node.js 20 | `actions/setup-node@v4` (cache npm) | Ambiente de execução |
+| Setup Node.js 24 | `actions/setup-node@v4` (cache npm) | Ambiente de execução |
 | Instalar dependências | `npm install` | Resolve pacotes |
 | Lint HTML | `npm run lint` | HTMLHint valida estrutura HTML |
 | Testes unitários | `npm test` | Jest — 19 testes, cobertura mínima 60% |
@@ -198,7 +198,7 @@ flowchart TD
 
     subgraph CI_BLOCK ["ci.yml — Integração Contínua"]
         direction TB
-        TRIGGER --> CI_JOB[Job: ci\n─────────────\n① Checkout\n② Node.js 20 + cache npm\n③ npm install\n④ npm run lint → HTMLHint\n⑤ npm test → Jest 19 testes\n⑥ npm audit moderado\n⑦ Upload coverage-report]
+        TRIGGER --> CI_JOB[Job: ci\n─────────────\n① Checkout\n② Node.js 24 + cache npm\n③ npm install\n④ npm run lint → HTMLHint\n⑤ npm test → Jest 19 testes\n⑥ npm audit moderado\n⑦ Upload coverage-report]
 
         TRIGGER --> IAC_JOB[Job: iac-validation\n─────────────\n① Checkout\n② Python 3.12\n③ pip install cfn-lint\n④ cfn-lint nos 4 templates\n⑤ Verifica presença dos templates]
     end

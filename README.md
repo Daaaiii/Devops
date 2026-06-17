@@ -344,7 +344,7 @@ Vá em **Settings → Secrets and variables → Actions** e configure:
 
 ### 6.1 Pré-requisitos
 
-- Node.js 20 ou superior
+- Node.js 24 ou superior
 - npm 9 ou superior
 - Git
 - Docker (para build da imagem)
