@@ -144,29 +144,47 @@ O repositório segue o modelo GitFlow simplificado:
 
 Acionado em push para `main`/`develop`, em PRs para `main` e via `workflow_dispatch`. Dois jobs paralelos:
 
-```
-Trigger (push / PR / workflow_dispatch)
-       │
-       ├───────────────────────────────────────┐
-       ▼                                       ▼
-┌──────────────────────────┐   ┌──────────────────────────────┐
-│   Job: ci                │   │   Job: iac-validation        │
-│  Node.js 20              │   │  Python 3.12                 │
-│                          │   │                              │
-│  1. Checkout             │   │  1. Checkout                 │
-│  2. Setup Node.js 20     │   │  2. Setup Python 3.12        │
-│  3. npm install          │   │  3. pip install cfn-lint     │
-│  4. HTMLHint (lint)      │   │  4. cfn-lint (4 templates)   │
-│  5. Jest + cobertura     │   │  5. Verificar estrutura IaC  │
-│  6. npm audit            │   └──────────────────────────────┘
-│  7. Upload cobertura     │
-└──────────────────────────┘
+```mermaid
+flowchart TB
+
+    A["Trigger<br/>(push / PR / workflow_dispatch)"]
+
+    A --> B
+    A --> C
+
+    subgraph CI["Job: ci (Node.js 24)"]
+        direction TB
+        B["1. Checkout"]
+        B --> B1["2. Setup Node.js 24"]
+        B1 --> B2["3. npm install"]
+        B2 --> B3["4. HTMLHint (lint)"]
+        B3 --> B4["5. Jest + cobertura"]
+        B4 --> B5["6. npm audit"]
+        B5 --> B6["7. Upload cobertura"]
+    end
+
+    subgraph IAC["Job: iac-validation (Python 3.12)"]
+        direction TB
+        C["1. Checkout"]
+        C --> C1["2. Setup Python 3.12"]
+        C1 --> C2["3. pip install cfn-lint"]
+        C2 --> C3["4. cfn-lint (4 templates)"]
+        C3 --> C4["5. Verificar estrutura IaC"]
+    end
+
+    classDef trigger fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px;
+    classDef ci fill:#ede9fe,stroke:#7c3aed,color:#581c87,stroke-width:2px;
+    classDef iac fill:#ffedd5,stroke:#ea580c,color:#9a3412,stroke-width:2px;
+
+    class A trigger;
+    class B,B1,B2,B3,B4,B5,B6 ci;
+    class C,C1,C2,C3,C4 iac;
 ```
 
 | Etapa | Descrição |
 |-------|-----------|
 | Checkout | Clona o repositório e prepara o ambiente no runner. |
-| Setup Node.js 20 | Instala Node.js 20 com cache de pacotes npm. |
+| Setup Node.js 24 | Instala Node.js 24 com cache de pacotes npm. |
 | npm install | Instala Jest e HTMLHint. |
 | Lint | Valida HTML com HTMLHint usando as regras de `.htmlhintrc`. |
 | Testes Unitários | 19 testes com Jest em ambiente jsdom, cobertura mínima de 60%. |
@@ -177,22 +195,49 @@ Trigger (push / PR / workflow_dispatch)
 
 Acionado apenas em push para `main`. Executa após o CI passar.
 
-```
-Push para main
-       │
-       ▼
-┌─────────────────────────────────────────────────────────┐
-│            GitHub Actions — cd.yml                      │
-│                                                         │
-│  1. Checkout                                            │
-│  2. Docker build (multi-stage)                          │
-│  3. Configurar credenciais AWS                          │
-│  4. CloudFormation deploy (storage stack)               │
-│     → cria/atualiza o bucket S3                         │
-│  5. Obter nome do bucket via output do CloudFormation   │
-│  6. aws s3 sync index.html → S3                         │
-│  7. Exibir URL do site publicado                        │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+
+    A["Push para main"]
+
+    subgraph GH["GitHub Actions - cd.yml"]
+        direction TB
+        B["Checkout"]
+        C["Docker build<br/>(multi-stage)"]
+        B --> C
+    end
+
+    subgraph AWS["AWS"]
+        direction TB
+        D["Configurar credenciais AWS"]
+        E["CloudFormation deploy<br/>(storage stack)"]
+        F["Criar/Atualizar bucket S3"]
+        G["Obter nome do bucket"]
+        H["aws s3 sync<br/>index.html → S3"]
+
+        D --> E --> F --> G --> H
+    end
+
+    subgraph DEPLOY["Publicação"]
+        direction TB
+        I["Site publicado"]
+        J["Exibir URL"]
+        I --> J
+    end
+
+    A --> B
+    C --> D
+    H --> I
+
+    classDef trigger fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
+    classDef github fill:#ede9fe,stroke:#7c3aed,color:#581c87;
+    classDef aws fill:#ffedd5,stroke:#ea580c,color:#9a3412;
+    classDef deploy fill:#dcfce7,stroke:#16a34a,color:#166534;
+
+    class A trigger;
+    class B,C github;
+    class D,E,F,G,H aws;
+    class I,J deploy;
 ```
 
 O bucket S3 é **provisionado automaticamente** pelo pipeline via CloudFormation (`storage.yaml`) na etapa 4. O nome do bucket é obtido pelo output `WebsiteBucketName` da stack, eliminando a necessidade de configurá-lo manualmente como secret.
