@@ -187,52 +187,7 @@ O nome do bucket é resolvido dinamicamente pelo output do stack CloudFormation,
 
 ### 4.1 Fluxograma de Todas as Etapas do Pipeline
 
-```mermaid
-flowchart TD
-    DEV([Developer\ngit push]) --> BRANCH{Branch?}
-
-    BRANCH -->|feature/* ou develop| PR[Abre Pull Request\npara main]
-    BRANCH -->|main\nvia PR aprovado| TRIGGER
-
-    PR --> TRIGGER[GitHub Actions\ndispara workflows]
-
-    subgraph CI_BLOCK ["ci.yml — Integração Contínua"]
-        direction TB
-        TRIGGER --> CI_JOB[Job: ci\n─────────────\n① Checkout\n② Node.js 24 + cache npm\n③ npm install\n④ npm run lint → HTMLHint\n⑤ npm test → Jest 19 testes\n⑥ npm audit moderado\n⑦ Upload coverage-report]
-
-        TRIGGER --> IAC_JOB[Job: iac-validation\n─────────────\n① Checkout\n② Python 3.12\n③ pip install cfn-lint\n④ cfn-lint nos 4 templates\n⑤ Verifica presença dos templates]
-    end
-
-    CI_JOB --> CI_OK{Lint + Testes\npassaram?}
-    IAC_JOB --> IAC_OK{Templates CF\nválidos?}
-
-    CI_OK -->|não| FAIL([Falha\nPR bloqueado])
-    IAC_OK -->|não| FAIL
-
-    CI_OK -->|sim| GATE{Push\npara main?}
-    IAC_OK -->|sim| GATE
-
-    GATE -->|não — é PR| MERGE([PR aprovado\nMerge liberado])
-    GATE -->|sim| CD_TRIGGER
-
-    subgraph CD_BLOCK ["cd.yml — Entrega Contínua (somente main)"]
-        direction TB
-        CD_TRIGGER[Job: deploy] --> DOCKER[① Checkout\n② docker build -t devops-app .\n   Stage 1: npm ci → htmlhint → jest\n   Stage 2: nginx:alpine + index.html]
-
-        DOCKER --> DOCKER_OK{Build\nOK?}
-        DOCKER_OK -->|não| FAIL
-
-        DOCKER_OK -->|sim| CREDS[③ configure-aws-credentials\n   AWS_ACCESS_KEY_ID\n   AWS_SECRET_ACCESS_KEY\n   AWS_SESSION_TOKEN\n   AWS_REGION]
-
-        CREDS --> CF[④ aws cloudformation deploy\n   stack: devops-fase1-storage\n   cria ou atualiza bucket S3]
-
-        CF --> BUCKET[⑤ describe-stacks\n   obtém WebsiteBucketName\n   do output do stack]
-
-        BUCKET --> SYNC[⑥ aws s3 sync\n   index.html → s3://bucket\n   --delete]
-
-        SYNC --> URL([Site publicado\nS3 Static Website Hosting\nURL exibida nos logs])
-    end
-```
+![Fluxograma](fluxo-devops.png)
 
 ### 4.2 Tabela Resumo das Etapas
 
